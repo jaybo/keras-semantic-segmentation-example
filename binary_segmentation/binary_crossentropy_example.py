@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from keras.models import Model
+from keras.models import Model, load_model
 from keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D, Conv2D, Reshape
 from keras.layers import concatenate
 from keras.layers.normalization import BatchNormalization
@@ -23,14 +23,17 @@ import models
 #Parameters
 INPUT_CHANNELS = 3
 NUMBER_OF_CLASSES = 1
-IMAGE_W = 224
-IMAGE_H = 224
+IMAGE_W = 256
+IMAGE_H = 256
 
 epochs = 100*1000
 patience = 60
-batch_size = 8
+batch_size = 16
+steps_per_epoch = 100
 
 loss_name = "binary_crossentropy"
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 def get_model():
     
@@ -64,7 +67,7 @@ def gen_random_image():
     img[:, :, 0] = colors[0]
     img[:, :, 1] = colors[1]
     img[:, :, 2] = colors[2]
-
+    
     # Object class 1
     obj1_color0 = colors[3]
     obj1_color1 = colors[4]
@@ -128,12 +131,17 @@ def visualy_inspect_result():
     cv2.imshow('mask object 1',y_pred[:,:,0])
     cv2.waitKey(0)
 
-def save_prediction():
+def save_prediction(filename=None):
     
     model = get_model()
     model.load_weights('model_weights_'+loss_name+'.h5')
     
-    img,mask= gen_random_image()
+    if filename:
+        print (os.getcwd())
+        img = cv2.imread(filename)
+        mask = np.zeros_like(img)
+    else:
+        img,mask= gen_random_image()
     
     y_pred= model.predict(img[None,...].astype(np.float32))[0]
     
@@ -163,20 +171,25 @@ def visualy_inspect_generated_data():
     cv2.imshow('mask object 1',mask[:,:,0])
     cv2.waitKey(0)
 
-def train():
-    model = get_model()
+def train(retrain=False):
+
+    model_name = 'model_weights_'+loss_name+'.h5'
+    if retrain:
+        model = load_model(model_name)
+    else:
+        model = get_model()
     
     callbacks = [
         EarlyStopping(monitor='val_loss', patience=patience, verbose=0),
-        ModelCheckpoint('model_weights_'+loss_name+'.h5', monitor='val_loss', save_best_only=True, verbose=0),
+        ModelCheckpoint(model_name, monitor='val_loss', save_best_only=True, verbose=0),
     ]
 
     history = model.fit_generator(
         generator=batch_generator(batch_size),
-        nb_epoch=epochs,
-        samples_per_epoch=100,
+        steps_per_epoch=steps_per_epoch,
+        epochs=epochs,
         validation_data=batch_generator(batch_size),
-        nb_val_samples=10,
+        validation_steps=10,
         verbose=1,
         shuffle=False,
         callbacks=callbacks)
@@ -184,9 +197,11 @@ def train():
 if __name__ == '__main__':
     #visualy_inspect_generated_data()
     
-    train()
-    #visualy_inspect_result()
-    save_prediction() 
+    # train()
+    # train(retrain=True)
+    # visualy_inspect_result()
+    #save_prediction() 
+    save_prediction(r"e:\GitHub\keras-semantic-segmentation-example\binary_segmentation\test.png") 
     
     
     
